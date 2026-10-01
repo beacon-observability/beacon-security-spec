@@ -1,0 +1,27 @@
+{
+  "fingerprint_version": 1,
+  "vectors": [
+    {
+      "name": "java SQL sink with sorted source signatures",
+      "input": {
+        "application_id": "app-dc6b8b0dc435531262eedacdf8fe51bd619964caa0e12bb4c29477448fdda8ae",
+        "language": "java",
+        "rule": "sql_injection",
+        "sink": {
+          "function": "java.sql.Statement.executeQuery",
+          "role": "sql_template",
+          "location": "example.Orders#find(Orders.java:42)",
+          "operation": "",
+          "path_role": "",
+          "input_part": ""
+        },
+        "source_signatures": [
+          "http.request.parameter|customer",
+          "http.request.header|x-tenant",
+          "http.request.parameter|customer"
+        ]
+      },
+      "expected": "finding-555321b3086c32e527cfd1f07854e1c8a81c848704d399c3124865fb4e734180"
+    }
+  ]
+}

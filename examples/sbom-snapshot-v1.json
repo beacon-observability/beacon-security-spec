@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "source": "beacon_security_sbom",
+  "event_name": "beacon.security.sbom.snapshot",
+  "observed_at": "2026-10-02T00:00:00.000Z",
+  "application_id": "app-dc6b8b0dc435531262eedacdf8fe51bd619964caa0e12bb4c29477448fdda8ae",
+  "instance_id": "9fb15116-8d2b-4f1d-bc08-e5570928136f",
+  "service": {
+    "service.namespace": "shop",
+    "service.name": "orders"
+  },
+  "code": {
+    "repository": "",
+    "commit": "",
+    "build_id": "",
+    "service_version": ""
+  },
+  "runtime": {
+    "language": "java",
+    "implementation": "jvm",
+    "version": "21.0.3",
+    "os": "linux",
+    "architecture": "x64",
+    "details": {}
+  },
+  "identity_status": "configured",
+  "sbom_id": "urn:uuid:81772d2d-4556-4a7c-903f-b76751f336bb",
+  "revision": 1,
+  "release_id": "release-example",
+  "status": "current",
+  "completeness": "incomplete",
+  "reasons": ["runtime_dependency_graph_incomplete"],
+  "component_count": 1,
+  "part_index": 0,
+  "part_count": 1,
+  "dependencies": [
+    {
+      "name": "org.example:orders-core",
+      "version": "1.2.3"
+    }
+  ]
+}

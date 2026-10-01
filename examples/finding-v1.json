@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "source": "beacon_security",
+  "event_name": "beacon.security.finding",
+  "observed_at": "2026-10-02T00:00:00.000Z",
+  "application_id": "app-dc6b8b0dc435531262eedacdf8fe51bd619964caa0e12bb4c29477448fdda8ae",
+  "instance_id": "9fb15116-8d2b-4f1d-bc08-e5570928136f",
+  "service": {
+    "service.namespace": "shop",
+    "service.name": "orders",
+    "service.version": "1.2.3"
+  },
+  "code": {
+    "repository": "https://example.invalid/shop/orders",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "build_id": "",
+    "service_version": "1.2.3"
+  },
+  "runtime": {
+    "language": "java",
+    "implementation": "jvm",
+    "version": "21.0.3",
+    "os": "linux",
+    "architecture": "x64",
+    "details": {
+      "vendor": "Example JVM",
+      "vm_name": "Example VM"
+    }
+  },
+  "identity_status": "configured",
+  "evidence_id": "ev-6c196664-ef4a-4c11-83ed-b932da1e5a95",
+  "finding_id": "finding-555321b3086c32e527cfd1f07854e1c8a81c848704d399c3124865fb4e734180",
+  "fingerprint_version": 1,
+  "rule": "sql_injection",
+  "assessment": "candidate_risk",
+  "validation": "unvalidated",
+  "severity": "unassigned",
+  "confidence": "modeled_flow",
+  "execution_observation": "invocation_attempt",
+  "precision": "exact",
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "server_span_id": "0123456789abcdef",
+  "current_span_id": "fedcba9876543210",
+  "trace_flags": 1,
+  "sources": [
+    {
+      "id": "src-1",
+      "type": "http.request.parameter",
+      "name": "customer",
+      "location": "example.http.Request.getParameter",
+      "value_type": "string",
+      "value_length": 5
+    },
+    {
+      "id": "src-2",
+      "type": "http.request.header",
+      "name": "x-tenant",
+      "location": "example.http.Request.getHeader",
+      "value_type": "string",
+      "value_length": 4
+    }
+  ],
+  "propagation": [
+    {
+      "id": 1,
+      "parent_id": null,
+      "source_id": "src-1",
+      "operation": "source",
+      "location": "example.http.Request.getParameter"
+    }
+  ],
+  "ranges": [
+    {
+      "source_id": "src-1",
+      "start": 46,
+      "end": 51,
+      "exact": true,
+      "unit": "utf16_code_unit"
+    }
+  ],
+  "sink": {
+    "function": "java.sql.Statement.executeQuery",
+    "role": "sql_template",
+    "location": "example.Orders#find(Orders.java:42)",
+    "operation": "",
+    "path_role": "",
+    "input_part": ""
+  },
+  "truncated": false,
+  "coverage": "modeled_calls_only",
+  "coverage_gaps": [],
+  "request": {
+    "method": "GET",
+    "route": "/orders",
+    "route_status": "observed",
+    "status_code": 200,
+    "started_at": "2026-10-02T00:00:00.000Z",
+    "ended_at": "2026-10-02T00:00:00.010Z",
+    "framework": "",
+    "transport": "",
+    "error_type": ""
+  },
+  "component": {
+    "status": "resolved",
+    "sbom_id": "urn:uuid:81772d2d-4556-4a7c-903f-b76751f336bb",
+    "revision": 1,
+    "release_id": "release-example",
+    "application_id": "app-dc6b8b0dc435531262eedacdf8fe51bd619964caa0e12bb4c29477448fdda8ae",
+    "bom-ref": "urn:beacon:security:component:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "reason": "",
+    "observed_url": "",
+    "query": ""
+  },
+  "stack": ["example.Orders.find(Orders.java:42)"],
+  "run": {},
+  "triage": { "decision": "unreviewed" }
+}
