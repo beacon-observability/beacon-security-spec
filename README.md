@@ -17,8 +17,9 @@ backend accepts the data.
 
 | Implementation | Repository | Current evidence |
 | --- | --- | --- |
-| Java | [beacon-java](https://github.com/beacon-observability/beacon-java) | Implemented and locally validated; release acceptance pending. |
-| Other languages | Their future language repositories | Not implemented or validated against this contract. |
+| Java | [beacon-java](https://github.com/beacon-observability/beacon-java) | Implemented, locally validated, and released as an opt-in capability in Beacon Java 1.1.0. |
+| Node.js and Python | Their language repositories | Conformance vectors are defined; implementations are not yet merged or validated. |
+| Other languages | Their language repositories | Not implemented or validated against this contract. |
 
 ## Contract layout
 
