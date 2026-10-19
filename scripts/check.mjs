@@ -71,3 +71,21 @@ assert.ok(sbom.part_count >= 1);
 assert.equal(sbom.component_count, sbom.dependencies.length);
 
 console.log('PASS: Beacon Security schema JSON, examples, and fingerprint v1 vectors are consistent.');
+
+const occurrence = json('examples/finding-occurrence-v1.json');
+assert.equal(occurrence.finding_id, finding.finding_id);
+assert.notEqual(occurrence.evidence_id, finding.evidence_id);
+assert.equal(occurrence.occurrence_id, occurrence.evidence_id);
+assert.equal(occurrence.evidence_sampled, false);
+assert.equal(occurrence.truncated, true);
+for (const field of ['sources', 'propagation', 'ranges', 'stack']) {
+  assert.deepEqual(occurrence[field], []);
+}
+assert.deepEqual(schema.$defs.attackEvidence.properties.status.enum,
+  ['unknown', 'no_evidence', 'suspected']);
+for (const event of [finding, occurrence]) {
+  assert.equal(event.attack_evidence.outcome, 'not_assessed');
+  assert(schema.$defs.attackEvidence.properties.status.enum.includes(event.attack_evidence.status));
+  for (const field of schema.$defs.finding.allOf[1].required) assert(field in event, field);
+}
+console.log('PASS: occurrence sampling and request-specific attack evidence examples.');
