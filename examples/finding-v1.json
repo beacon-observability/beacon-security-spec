@@ -111,7 +111,21 @@
     "observed_url": "",
     "query": ""
   },
-  "stack": ["example.Orders.find(Orders.java:42)"],
+  "stack": [
+    "example.Orders.find(Orders.java:42)"
+  ],
   "run": {},
-  "triage": { "decision": "unreviewed" }
+  "triage": {
+    "decision": "unreviewed"
+  },
+  "attack_evidence": {
+    "status": "no_evidence",
+    "reason": "sql_data_only",
+    "outcome": "not_assessed"
+  },
+  "occurrence_id": "ev-6c196664-ef4a-4c11-83ed-b932da1e5a95",
+  "evidence_sampled": true,
+  "evidence_sample_reason": "evidence_upgrade",
+  "aggregation_status": "tracked",
+  "occurrences_total": 1
 }

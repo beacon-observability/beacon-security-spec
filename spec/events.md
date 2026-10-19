@@ -53,6 +53,62 @@ The initial canonical rules are `sql_injection`, `command_injection`, `command_e
 `http_request_input`, and `path_traversal`. Implementations document which rules and frameworks
 they actually cover.
 
+## Per-request occurrences and evidence sampling
+
+Implementations supporting occurrence delivery export one `beacon.security.finding` per finding
+fingerprint per request, including requests inside the full-evidence sampling window. `occurrence_id`
+is an alias of that request's `evidence_id`. Deduplicated updates within a request keep that ID.
+Trace and span fields describe that occurrence, never a previous representative sample.
+
+The following fields are additive in schema v1; consumers must accept older producers that omit them:
+
+| Field | Meaning |
+| --- | --- |
+| `evidence_sampled` | Whether detailed evidence was retained in this record. This is not trace sampling. |
+| `evidence_sample_reason` | Why evidence was retained or omitted, such as `evidence_upgrade`, `interval_or_run`, `interval`, `finding_capacity`, or `record_byte_limit`. |
+| `aggregation_status` | `tracked` or `capacity_exceeded`; process-local aggregation may be full while the occurrence is still exported. |
+| `occurrences_total` | Process-local, per-finding count of requests with a detection; absent when aggregation is unavailable. |
+
+When full evidence is sampled out, preserve identity, rule, risk assessment, request-specific attack
+evidence, sink, request context, and trace correlation. Keep required arrays (`sources`, `propagation`,
+`ranges`, `stack`) present but empty, set `evidence_sampled=false`, `truncated=true`, and declare
+`truncation_reason=evidence_sampled_out`. Empty arrays in such records do not mean there was no taint.
+Export byte limits may additionally truncate a record; the truncation envelope remains available for
+limits too small to preserve normal occurrence fields. Export loss and aggregation loss must remain
+observable. Occurrence delivery is bounded, not a promise of durable or lossless delivery.
+
+Stronger request evidence can upgrade a deduplicated occurrence and bypass ordinary full-evidence
+sampling. It must not change the fingerprint or overwrite the classification of another request.
+A retained representative sample must not regress to weaker evidence when a later ordinary request
+arrives. Snapshot `last_trace_id` can therefore differ from the representative's trace ID.
+
+## Request-specific attack evidence
+
+The optional `attack_evidence` object is separate from `assessment` and `validation`:
+
+| Field | Meaning |
+| --- | --- |
+| `status=unknown` | Evidence is unavailable, imprecise, unsupported, or requires missing policy. |
+| `status=no_evidence` | The supported analysis did not identify attack evidence; this is not a safety verdict. |
+| `status=suspected` | The supported analysis found evidence of possible exploitation, not proof of intent or success. |
+| `reason` | Bounded machine-readable explanation, without raw request values. |
+| `outcome=not_assessed` | Exploitation outcome has not been established. |
+
+A normal input may reveal a candidate code risk while carrying no attack evidence. Parameter binding
+must be distinguished from concatenating an untrusted SQL template before preparation. Recognizing a
+sanitizer or validation call alone is not sufficient to clear taint or declare an operation safe.
+Implementations document supported dialects, syntax, boundary policies, and analysis budgets.
+Unsupported cases must retain uncertainty. Observing an invocation, a normal return, or an HTTP status
+alone does not establish successful exploitation.
+
+Finding summaries and local snapshots may include `attack_evidence_counts`, with `unknown`,
+`no_evidence`, and `suspected` counters partitioning their aggregate occurrence count. Counts reflect
+the strongest retained evidence for each request's deduplicated finding. They must not be presented
+as confirmed attack counts. A snapshot may retain `strongest_attack_evidence` independently of the
+latest occurrence. When deduplicating invocations, suspected evidence takes precedence over
+unknown, and unknown takes precedence over no evidence so an unsupported invocation is not
+hidden by an earlier ordinary one. Older producers and missing fields remain supported.
+
 ## Source, propagation, range, and sink
 
 A source has `id`, `type`, `name`, `location`, `value_type`, and `value_length`. Names and locations
