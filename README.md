@@ -7,9 +7,14 @@ repositories and pin an exact commit from this repository.
 
 ## Status
 
-The contract is under development and has no stable release yet. Schema version 1 and fingerprint
-version 1 describe the new Beacon namespace; they do not provide compatibility aliases for the
-former SecurityContext packages, `security.*` configuration, or `security_context` event source.
+The contract is under development and has no stable release yet. Event schemas 1 and 2 share
+fingerprint version 1 and the Beacon namespace. V2 is a breaking wire-format update; v1 schemas,
+examples, and vectors remain available unchanged. Neither version provides aliases for former
+SecurityContext packages, `security.*` configuration, or the `security_context` event source.
+
+V2 matches the Java implementation proposed in
+[beacon-java PR #43](https://github.com/beacon-observability/beacon-java/pull/43); release status
+and runtime support remain owned by that repository.
 
 Only the Java implementation has local conformance evidence today. A specification does not imply
 that every language implements it, that an implementation has passed release acceptance, or that a
@@ -23,11 +28,13 @@ backend accepts the data.
 
 ## Contract layout
 
-- [Event contract](spec/events.md)
+- [V2 event contract and migration](spec/events-v2.md)
+- [V2 JSON Schema](schemas/beacon-security-event-v2.schema.json)
+- [V1 event contract](spec/events.md)
 - [Identity and fingerprint](spec/identity-and-fingerprint.md)
 - [Configuration](spec/configuration.md)
-- [Runtime SBOM](spec/runtime-sbom.md)
-- [JSON Schema](schemas/beacon-security-event-v1.schema.json)
+- [V1 runtime SBOM](spec/runtime-sbom.md)
+- [V1 JSON Schema](schemas/beacon-security-event-v1.schema.json)
 - [Examples](examples/)
 - [Conformance vectors](test-vectors/)
 
