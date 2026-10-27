@@ -89,3 +89,56 @@ for (const event of [finding, occurrence]) {
   for (const field of schema.$defs.finding.allOf[1].required) assert(field in event, field);
 }
 console.log('PASS: occurrence sampling and request-specific attack evidence examples.');
+
+// V2 is additive to this repository; keep all v1 validation and vectors above unchanged.
+const schema2 = json('schemas/beacon-security-event-v2.schema.json');
+assert.equal(schema2.$schema, schema.$schema);
+assert.match(schema2.$id, /beacon-security-event-v2\.schema\.json$/);
+assert.equal(schema2.$defs.finding.properties.schema_version.const, 2);
+assert.equal(schema2.$defs.inventory.properties.schema_version.const, 2);
+assert.deepEqual(schema2.$defs.finding.properties.attack_evidence.properties.status.enum,
+  ['unknown', 'no_evidence', 'suspected']);
+assert.deepEqual(schema2.$defs.finding.properties.attack_evidence.required, ['status', 'reason']);
+assert.equal(schema2.$defs.finding.additionalProperties, false);
+assert.equal(schema2.$defs.inventory.additionalProperties, false);
+
+const finding2 = json('examples/finding-v2.json');
+const occurrence2 = json('examples/finding-occurrence-v2.json');
+const inventory2 = json('examples/sbom-inventory-v2.json');
+for (const event of [finding2, occurrence2, inventory2]) {
+  assert.equal(event.schema_version, 2);
+  assert.match(event.instance_id, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+  assert(Number.isFinite(Date.parse(event.observed_at)));
+  assert(!('application_id' in event));
+  const definition = event.event_name === 'beacon.security.finding'
+    ? schema2.$defs.finding : schema2.$defs.inventory;
+  for (const key of definition.required) assert(key in event, key);
+  for (const key of Object.keys(event)) assert(key in definition.properties, key);
+}
+for (const event of [finding2, occurrence2]) {
+  assert.equal(event.finding_id, finding.finding_id);
+  assert.equal(event.fingerprint_version, 1);
+  assert(!('evidence_id' in event));
+  assert(!('outcome' in event.attack_evidence));
+  assert.equal(typeof event.evidence_sampled, 'boolean');
+  assert.equal(typeof event.collection_complete, 'boolean');
+  const normalizedSink = Object.fromEntries(['role', 'function', 'location', 'operation',
+    'path_role', 'input_part'].map((field) => [field, event.sink[field] ?? '']));
+  assert.equal(fingerprint({ ...vectors.vectors[0].input, sink: normalizedSink }), event.finding_id);
+}
+assert.notEqual(finding2.occurrence_id, occurrence2.occurrence_id);
+assert.equal(occurrence2.evidence_sampled, false);
+assert.equal(occurrence2.evidence_sample_reason, 'interval');
+assert.equal(occurrence2.collection_complete, true);
+assert(!('truncated' in occurrence2));
+for (const field of ['sources', 'propagation', 'ranges', 'stack']) assert(!(field in occurrence2));
+assert.equal(inventory2.source, 'beacon_security_sbom');
+assert.equal(inventory2.event_name, 'beacon.security.sbom.inventory');
+assert.equal(typeof inventory2.uptime_ms, 'number');
+assert(Number.isSafeInteger(inventory2.uptime_ms) && inventory2.uptime_ms >= 0);
+assert.equal(Date.parse(inventory2.observed_at) - Date.parse(inventory2.started_at), inventory2.uptime_ms);
+assert(!('part_index' in inventory2));
+assert(!('part_count' in inventory2));
+assert(!('status' in inventory2));
+assert(!('error' in inventory2));
+console.log('PASS: schema v2 inventory, compact occurrence examples, and unchanged fingerprint v1.');
