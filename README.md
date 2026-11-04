@@ -12,19 +12,17 @@ fingerprint version 1 and the Beacon namespace. V2 is a breaking wire-format upd
 examples, and vectors remain available unchanged. Neither version provides aliases for former
 SecurityContext packages, `security.*` configuration, or the `security_context` event source.
 
-V2 matches the Java implementation proposed in
-[beacon-java PR #43](https://github.com/beacon-observability/beacon-java/pull/43); release status
-and runtime support remain owned by that repository.
+Released Java, Node.js, and Python runtimes provide schema v2 and the export policy described
+in this repository. Runtime support, pinned contract revisions, and release acceptance remain
+owned by each language repository. Published release evidence is not certification that every
+implementation passes every conformance vector, or that a backend accepts its data.
 
-Only the Java implementation has local conformance evidence today. A specification does not imply
-that every language implements it, that an implementation has passed release acceptance, or that a
-backend accepts the data.
-
-| Implementation | Repository | Current evidence |
-| --- | --- | --- |
-| Java | [beacon-java](https://github.com/beacon-observability/beacon-java) | Implemented, locally validated, and released as an opt-in capability in Beacon Java 1.1.0. |
-| Node.js and Python | Their language repositories | Conformance vectors are defined; implementations are not yet merged or validated. |
-| Other languages | Their language repositories | Not implemented or validated against this contract. |
+| Implementation | Released runtime evidence |
+| --- | --- |
+| Java | [Beacon Java 1.3.4](https://github.com/beacon-observability/beacon-java/releases/tag/v1.3.4): schema v2, fingerprint v1, default `no_evidence` filtering with an opt-in export switch. |
+| Node.js | [Beacon Node.js 2.0.1](https://github.com/beacon-observability/beacon-nodejs/releases/tag/v2.0.1): schema v2, fingerprint v1, and the same export-policy setting. |
+| Python | [Beacon Python 1.2.4](https://github.com/beacon-observability/beacon-python/releases/tag/v1.2.4): schema v2, fingerprint v1, and the same export-policy setting. |
+| Other languages | Validate their released implementation and pinned contract before claiming conformance. |
 
 ## Contract layout
 
