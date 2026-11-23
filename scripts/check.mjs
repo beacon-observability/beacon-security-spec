@@ -143,3 +143,13 @@ assert(!('part_count' in inventory2));
 assert(!('status' in inventory2));
 assert(!('error' in inventory2));
 console.log('PASS: schema v2 inventory, compact occurrence examples, and unchanged fingerprint v1.');
+
+// Current producer output has one invocation span field without aliases.
+assert(!('server_span_id' in schema2.$defs.finding.properties));
+assert(!('current_span_id' in schema2.$defs.finding.properties));
+for (const event of [finding2, occurrence2]) {
+  assert.match(event.span_id, /^[0-9a-f]{16}$/);
+  assert(!('server_span_id' in event));
+  assert(!('current_span_id' in event));
+}
+console.log('PASS: current invocation span_id and no legacy aliases.');

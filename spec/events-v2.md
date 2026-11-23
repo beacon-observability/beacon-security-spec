@@ -73,9 +73,13 @@ No raw request values, SQL, or shell scripts may be introduced by compaction or 
 Request context contains available method, route, HTTP status code, and non-empty error type.
 Sink context contains function, role, location, and only applicable non-empty operation/path/input
 fields. Source, propagation, range, and stack semantics remain as defined in v1. Non-empty evidence
-must not be silently shortened merely to reduce field count. A current span ID equal to the server
-span ID is omitted; a distinct current span ID may be retained. Trace IDs do not guarantee that a
-backend retained the corresponding trace.
+must not be silently shortened merely to reduce field count. Export the current invocation span as `span_id`, including when it is the HTTP server span.
+Neither the payload nor its SIEM envelope exports `server_span_id` or `current_span_id`.
+The current schema has no aliases for these removed fields. Omit `span_id` when no valid
+current span exists; do not substitute a different request-entry span. The OTel LogRecord
+associates with the detected invocation span when available. Internal request/server context
+tracking is implementation-owned and need not change. Trace IDs do not guarantee that a backend
+retained the corresponding trace.
 
 `component`, when resolved, directly contains name, version, and optional real artifact SHA-256;
 it no longer references an SBOM ID, revision, or release ID. Optional local debug context may retain
@@ -133,3 +137,11 @@ The next collection republishes current dependencies without accumulating missin
 
 Optional local CycloneDX output remains diagnostic; it does not add online event families or a
 durable history/replay mechanism. Existing v1 consumers must migrate explicitly before consuming v2.
+
+## Export envelope
+
+Current producers MUST export the [SIEM v1 envelope](siem-fields-v1.md).
+The v2 shape is the serialized evidence inside `message`, not an alternative
+output mode. There is no format-selection switch or legacy-output fallback.
+Historical stored records are not rewritten. Older released runtimes retain
+their originally pinned contract until upgraded.

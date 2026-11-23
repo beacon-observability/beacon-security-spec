@@ -9,8 +9,6 @@
   "rule": "sql_injection",
   "precision": "exact",
   "trace_id": "0123456789abcdef0123456789abcdef",
-  "server_span_id": "0123456789abcdef",
-  "current_span_id": "fedcba9876543210",
   "sources": [
     {
       "id": "src-1",
@@ -70,5 +68,6 @@
     "version": "1.2.3"
   },
   "evidence_sampled": true,
-  "collection_complete": true
+  "collection_complete": true,
+  "span_id": "fedcba9876543210"
 }

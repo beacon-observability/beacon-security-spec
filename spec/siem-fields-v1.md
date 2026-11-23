@@ -1,16 +1,18 @@
-# SIEM fifteen-field profile v1 (draft)
+# Security SIEM profile v1
 
 ## Status and scope
 
-This is a proposed, language-neutral projection of Security schema v2 into exactly fifteen
-top-level fields. It is not an adopted replacement for v2, a runtime implementation, or a
-Collector deployment. The profile has its own version, independently of the version of the
-Security payload retained in `message`. Existing v1/v2 contracts and fingerprint v1 are unchanged.
+This is the language-neutral Security export contract. Current producers MUST emit
+one SIEM envelope per event on the existing route, with fifteen required base
+fields and available process/trace correlation. It is the only current output
+format; no format-selection switch or legacy output mode is provided. The complete
+serialized v2 evidence remains in `message`. Fingerprint v1 is unchanged.
 
 The [JSON Schema](../schemas/beacon-security-siem-v1.schema.json),
-[examples](../examples/siem/), and [conformance vectors](../test-vectors/siem-v1.json) accompany
-this draft. No implementation currently claims conformance. The reference transformation is
-[siem-reference.mjs](../scripts/siem-reference.mjs); it is not a runtime exporter.
+[examples](../examples/siem/), [conformance vectors](../test-vectors/siem-v1.json)
+and [reference transformation](../scripts/siem-reference.mjs) define the contract.
+Runtime releases and backend acceptance require separate implementation evidence.
+Changing this standard does not upgrade already released runtimes.
 
 The target field set comes from the user-provided RunReveal pipeline catalog v8
 (`runreveal-pipeline-catalog-v8.html`, catalog date 2026-11-21). The local catalog is an input to
@@ -39,10 +41,10 @@ full-record preservation is required. Do not claim full OTLP archival from `mess
 
 ## Required fields
 
-Every field below MUST be present and have a string value. Missing identities use `""`, except `tenant_id`, which defaults to `"default"`;
-unassessed outcomes use `"unknown"`. No top-level `schema_version`, legacy field alias, or
-implementation-specific extra field is added. The profile/version is selected explicitly by the
-configured route or exporter and recorded in implementation provenance; consumers MUST NOT infer
+The fifteen base fields below MUST be present and have a string value. Missing identities use `""`, except `tenant_id`, which defaults to `"default"`;
+unassessed outcomes use `"unknown"`. No top-level `schema_version` or legacy field alias is added. The correlation
+fields below are retained when available. Record the profile/version in implementation
+provenance; consumers MUST NOT infer
 it from `message.schema_version`, which identifies the embedded payload only.
 
 In this table `body` denotes the parsed input, `resource` denotes the associated OTel Resource,
@@ -124,7 +126,7 @@ coverage, successful transmission, backend persistence, or freedom from vulnerab
 collections still emit no inventory. Consumers must not infer health from silence.
 
 `status=info` reflects the existing OTel INFO log level. Following the catalog's level conversion,
-`severity=informational` also reflects that log level; this draft does not claim an assessed risk
+`severity=informational` also reflects that log level; this contract does not claim an assessed risk
 severity. Inferring high/critical risk from a rule name, a suspected feature, or the presence of a
 finding is forbidden. A future risk grading contract must define its source and assessment rules
 and explicitly revise this baseline before emitting different values.
@@ -144,6 +146,21 @@ It is not the destination address or Collector peer address. Resolve proxy heade
 documented trusted-proxy policy; an untrusted forwarded header alone is insufficient. This profile
 does not require new authentication hooks or collection of raw request parameters. If verified
 request enrichment is unavailable, use the empty string and document the implementation gap.
+
+## Process and trace correlation
+
+Retain `instance_id` from the embedded event at the top level. Preserve available
+`trace_id`, `span_id`, and `trace_flags` with their original values and types.
+`trace_id` has 32 lowercase hexadecimal characters; `span_id` has 16.
+`trace_flags` is an integer in 0..255, not a string. These fields extend the
+fifteen base fields and count toward final serialized byte budgets.
+
+`span_id` is the span active at detection, even when it is the request-entry
+span. Omit it if unavailable; do not substitute a different span or fabricate
+trace context for inventory. Associate the OTel LogRecord with that same span.
+Neither the envelope nor current evidence emits `server_span_id` or
+`current_span_id`; these fields have no aliases. Historical stored records
+remain unchanged, but are not a current producer output mode.
 
 ## What renaming alone cannot supply
 
@@ -165,18 +182,20 @@ instrumentation.
 ## Data retained inside message
 
 The original event continues to carry `schema_version`, `event_name`, `instance_id`,
-`finding_id`, `fingerprint_version`, Trace/span IDs, request/sink context, attack-evidence status
+`finding_id`, `fingerprint_version`, `trace_id` / `span_id`, request/sink context, attack-evidence status
 and reason, source/propagation/range/stack evidence, component metadata, sampling flags/reasons,
 collection quality, coverage gaps, truncation markers, and optional run/triage context as present.
 Inventory retains dependencies, start time, uptime, and optional part metadata. Their v2 semantics
-are unchanged. Optional absence is not replaced with invented values. No additional sensitive
+are unchanged. Current producer findings use `span_id` for the current invocation and omit
+`server_span_id` / `current_span_id`; a span equal to the server span is retained. Historical
+messages remain original and are never rewritten by projection. Optional absence is not replaced with invented values. No additional sensitive
 parameter values, SQL, command content, or URLs are introduced by the normalization itself.
 
 ## Transport, budgets, and migration
 
 OTel retains the existing scope and native event name / `event.name` / `source` attributes,
-INFO severity, and string Body. When this profile is selected, that Body is the serialized
-fifteen-field envelope, whose `message` is the original v2 payload string. Existing contextual
+INFO severity, and string Body. The Body is the serialized
+SIEM envelope, whose `message` is the original v2 payload string. Existing contextual
 Resource and Span associations remain intact. Do not emit the profile a second time as a
 parallel copy of the same occurrence on the same route.
 
@@ -194,5 +213,5 @@ do not silently repurpose them for a different shape.
 
 Before adoption, each implementation must publish evidence for exact raw preservation, field
 semantics and absent enrichment, stable IDs, sampled/truncated events, escaped/non-ASCII inputs,
-final byte budgets, multipart assembly, and one real OTel-to-collector path. Neither this draft
+final byte budgets, multipart assembly, and one real OTel-to-collector path. Neither this contract
 nor its reference-vector checks establish production support or backend acceptance.
