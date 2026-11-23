@@ -28,6 +28,9 @@ backend accepts the data.
 
 ## Contract layout
 
+- [Draft SIEM fifteen-field profile v1](spec/siem-fields-v1.md) — proposed projection only;
+  not adopted by any runtime. Includes a [JSON Schema](schemas/beacon-security-siem-v1.schema.json),
+  [examples](examples/siem/), and [reference vectors](test-vectors/siem-v1.json).
 - [V2 event contract and migration](spec/events-v2.md)
 - [V2 JSON Schema](schemas/beacon-security-event-v2.schema.json)
 - [V1 event contract](spec/events.md)
