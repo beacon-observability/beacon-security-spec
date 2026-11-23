@@ -73,9 +73,12 @@ No raw request values, SQL, or shell scripts may be introduced by compaction or 
 Request context contains available method, route, HTTP status code, and non-empty error type.
 Sink context contains function, role, location, and only applicable non-empty operation/path/input
 fields. Source, propagation, range, and stack semantics remain as defined in v1. Non-empty evidence
-must not be silently shortened merely to reduce field count. A current span ID equal to the server
-span ID is omitted; a distinct current span ID may be retained. Trace IDs do not guarantee that a
-backend retained the corresponding trace.
+must not be silently shortened merely to reduce field count. Export the current invocation span as `span_id`, including when it is the HTTP server span.
+New producers do not export `server_span_id` or `current_span_id`. The schema retains these two
+deprecated optional properties only to read historical v2 records; existing stored data is not
+rewritten. Consumers migrate from `current_span_id` to `span_id`. Internal request/server context
+tracking is implementation-owned and need not change. Trace IDs do not guarantee that a backend
+retained the corresponding trace.
 
 `component`, when resolved, directly contains name, version, and optional real artifact SHA-256;
 it no longer references an SBOM ID, revision, or release ID. Optional local debug context may retain

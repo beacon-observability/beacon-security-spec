@@ -165,11 +165,13 @@ instrumentation.
 ## Data retained inside message
 
 The original event continues to carry `schema_version`, `event_name`, `instance_id`,
-`finding_id`, `fingerprint_version`, Trace/span IDs, request/sink context, attack-evidence status
+`finding_id`, `fingerprint_version`, `trace_id` / `span_id`, request/sink context, attack-evidence status
 and reason, source/propagation/range/stack evidence, component metadata, sampling flags/reasons,
 collection quality, coverage gaps, truncation markers, and optional run/triage context as present.
 Inventory retains dependencies, start time, uptime, and optional part metadata. Their v2 semantics
-are unchanged. Optional absence is not replaced with invented values. No additional sensitive
+are unchanged. Current producer findings use `span_id` for the current invocation and omit
+`server_span_id` / `current_span_id`; a span equal to the server span is retained. Historical
+messages remain original and are never rewritten by projection. Optional absence is not replaced with invented values. No additional sensitive
 parameter values, SQL, command content, or URLs are introduced by the normalization itself.
 
 ## Transport, budgets, and migration

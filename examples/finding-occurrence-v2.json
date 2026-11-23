@@ -9,8 +9,6 @@
   "rule": "sql_injection",
   "precision": "exact",
   "trace_id": "0123456789abcdef0123456789abcdef",
-  "server_span_id": "0123456789abcdef",
-  "current_span_id": "fedcba9876543210",
   "occurrence_id": "ev-6c196664-ef4a-4c11-83ed-b932da1e5a96",
   "attack_evidence": {
     "status": "no_evidence",
@@ -32,5 +30,6 @@
   },
   "evidence_sampled": false,
   "collection_complete": true,
-  "evidence_sample_reason": "interval"
+  "evidence_sample_reason": "interval",
+  "span_id": "fedcba9876543210"
 }
