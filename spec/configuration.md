@@ -8,6 +8,7 @@ environment-variable, configuration-file, or SDK binding.
 | `beacon.security.enabled` | `BEACON_SECURITY_ENABLED` | boolean | `false` | Enable the Security runtime lifecycle. |
 | `beacon.security.sbom.enabled` | `BEACON_SECURITY_SBOM_ENABLED` | boolean | `true` | Enable runtime SBOM while Security is enabled. |
 | `beacon.security.local-output.enabled` | `BEACON_SECURITY_LOCAL_OUTPUT_ENABLED` | boolean | `false` | Enable process-local diagnostic files. |
+| `beacon.security.export.no-evidence.enabled` | `BEACON_SECURITY_EXPORT_NO_EVIDENCE_ENABLED` | boolean | `false` | Export findings classified as `no_evidence`; `unknown` and `suspected` remain eligible regardless of this setting. |
 | `beacon.security.output` | `BEACON_SECURITY_OUTPUT` | path | implementation-defined | Diagnostic snapshot directory. |
 | `beacon.security.evidence.file` | `BEACON_SECURITY_EVIDENCE_FILE` | path | unset | Optional diagnostic JSONL evidence file. |
 

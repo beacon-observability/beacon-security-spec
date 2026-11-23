@@ -51,7 +51,22 @@ available request and trace context. A modeled flow to a sensitive call is not a
 | `no_evidence` | Supported analysis did not find attack evidence; this is not a safety verdict. |
 | `suspected` | Supported analysis found a possible attack feature, not proof of exploit success. |
 
-All three classifications remain reportable. V2 removes the constant outcome and fixed
+By default, implementations do not export findings whose `attack_evidence.status` is
+`no_evidence`. Set `beacon.security.export.no-evidence.enabled=true` (environment binding
+`BEACON_SECURITY_EXPORT_NO_EVIDENCE_ENABLED=true`) to include them. `unknown` and `suspected`
+remain eligible regardless of this setting. This policy applies before export queue admission to
+both OpenTelemetry Logs and the diagnostic evidence JSONL stream; intentional filtering is not
+export loss and must not consume delivery queue or rate budgets. SBOM inventories are unaffected.
+
+Classification, request-level deduplication, and evidence upgrades continue even when export of
+`no_evidence` is disabled. A later `unknown` or `suspected` invocation in the same request must
+still be eligible for export. Optional process-local finding snapshots and span summaries may
+retain these modeled observations; this switch controls event export, not detection or safety
+assessment. Consumers must accept all three statuses because producers may enable the switch.
+Existing producers pinned to the earlier contract may export all three by default; upgrading
+changes the default export policy without changing the schema or fingerprint version.
+
+V2 removes the constant outcome and fixed
 assessment/validation/severity/confidence fields; `precision` describes retained flow precision.
 No raw request values, SQL, or shell scripts may be introduced by compaction or classification.
 
