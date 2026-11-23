@@ -13,7 +13,7 @@ const fields = ['time', 'event_id', 'event_class', 'source', 'service', 'tenant_
   'actor', 'ip', 'action', 'target', 'target_type', 'outcome', 'status', 'severity', 'message'];
 assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
 assert.match(schema.$id, /beacon-security-siem-v1\.schema\.json$/);
-assert.deepEqual(schema.required, fields);
+assert.deepEqual(schema.required, [...fields, 'instance_id']);
 const correlation = ['instance_id', 'trace_id', 'span_id', 'trace_flags'];
 assert.deepEqual(Object.keys(schema.properties), [...fields, ...correlation]);
 assert.equal(schema.additionalProperties, false);
@@ -24,6 +24,11 @@ for (const vector of vectors.vectors) {
   const expected = json(vector.expected);
   const actual = normalize(raw, vector.resource, vector.context);
   assert.deepEqual(actual, expected, vector.name);
+  assert(schema.required.every(key => key in actual), vector.name);
+  const missingIdentity = { ...actual };
+  delete missingIdentity.instance_id;
+  assert(!schema.required.every(key => key in missingIdentity),
+    `${vector.name}: process identity must not be optional`);
   const payload = JSON.parse(raw);
   assert.deepEqual(Object.keys(actual), [...fields, ...correlation.filter(key => key in payload)], vector.name);
   for (const key of correlation.filter(key => key in payload)) assert.equal(actual[key], payload[key]);
