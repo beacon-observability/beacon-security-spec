@@ -74,9 +74,10 @@ Request context contains available method, route, HTTP status code, and non-empt
 Sink context contains function, role, location, and only applicable non-empty operation/path/input
 fields. Source, propagation, range, and stack semantics remain as defined in v1. Non-empty evidence
 must not be silently shortened merely to reduce field count. Export the current invocation span as `span_id`, including when it is the HTTP server span.
-New producers do not export `server_span_id` or `current_span_id`. The schema retains these two
-deprecated optional properties only to read historical v2 records; existing stored data is not
-rewritten. Consumers migrate from `current_span_id` to `span_id`. Internal request/server context
+Neither the payload nor its SIEM envelope exports `server_span_id` or `current_span_id`.
+The current schema has no aliases for these removed fields. Omit `span_id` when no valid
+current span exists; do not substitute a different request-entry span. The OTel LogRecord
+associates with the detected invocation span when available. Internal request/server context
 tracking is implementation-owned and need not change. Trace IDs do not guarantee that a backend
 retained the corresponding trace.
 
@@ -136,3 +137,11 @@ The next collection republishes current dependencies without accumulating missin
 
 Optional local CycloneDX output remains diagnostic; it does not add online event families or a
 durable history/replay mechanism. Existing v1 consumers must migrate explicitly before consuming v2.
+
+## Export envelope
+
+Current producers MUST export the [SIEM v1 envelope](siem-fields-v1.md).
+The v2 shape is the serialized evidence inside `message`, not an alternative
+output mode. There is no format-selection switch or legacy-output fallback.
+Historical stored records are not rewritten. Older released runtimes retain
+their originally pinned contract until upgraded.

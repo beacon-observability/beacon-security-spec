@@ -1,5 +1,5 @@
 {
-  "profile": "beacon-security-siem-v1-draft",
+  "profile": "beacon-security-siem-v1",
   "vectors": [
     {
       "name": "finding",

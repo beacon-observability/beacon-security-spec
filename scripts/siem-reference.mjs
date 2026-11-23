@@ -1,4 +1,4 @@
-// Draft SIEM profile reference only; not a runtime exporter or a trust-boundary validator.
+// SIEM contract reference; not a runtime exporter or a trust-boundary validator.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -35,6 +35,11 @@ export function normalize(raw, resource = {}, context = {}) {
     assert.match(body.finding_id, /^finding-[0-9a-f]{64}$/);
     assert(nonempty(body.rule));
   }
+  assert(!('server_span_id' in body));
+  assert(!('current_span_id' in body));
+  if ('span_id' in body) assert.match(body.span_id, /^[0-9a-f]{16}$/);
+  if ('trace_id' in body) assert.match(body.trace_id, /^[0-9a-f]{32}$/);
+  if ('trace_flags' in body) assert(Number.isInteger(body.trace_flags) && body.trace_flags >= 0 && body.trace_flags <= 255);
   const ip = nonempty(context.client_ip);
   return {
     time: body.observed_at,
@@ -52,5 +57,7 @@ export function normalize(raw, resource = {}, context = {}) {
     status: 'info',
     severity: 'informational',
     message: raw,
+    ...Object.fromEntries(['instance_id', 'trace_id', 'span_id', 'trace_flags']
+      .filter(key => key in body).map(key => [key, body[key]])),
   };
 }

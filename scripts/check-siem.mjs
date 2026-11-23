@@ -14,16 +14,21 @@ const fields = ['time', 'event_id', 'event_class', 'source', 'service', 'tenant_
 assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
 assert.match(schema.$id, /beacon-security-siem-v1\.schema\.json$/);
 assert.deepEqual(schema.required, fields);
-assert.deepEqual(Object.keys(schema.properties), fields);
+const correlation = ['instance_id', 'trace_id', 'span_id', 'trace_flags'];
+assert.deepEqual(Object.keys(schema.properties), [...fields, ...correlation]);
 assert.equal(schema.additionalProperties, false);
-assert.equal(vectors.profile, 'beacon-security-siem-v1-draft');
+assert.equal(vectors.profile, 'beacon-security-siem-v1');
 
 for (const vector of vectors.vectors) {
   const raw = read(vector.input);
   const expected = json(vector.expected);
   const actual = normalize(raw, vector.resource, vector.context);
   assert.deepEqual(actual, expected, vector.name);
-  assert.deepEqual(Object.keys(actual), fields, vector.name);
+  const payload = JSON.parse(raw);
+  assert.deepEqual(Object.keys(actual), [...fields, ...correlation.filter(key => key in payload)], vector.name);
+  for (const key of correlation.filter(key => key in payload)) assert.equal(actual[key], payload[key]);
+  assert(!('server_span_id' in actual));
+  assert(!('current_span_id' in actual));
   for (const field of fields) {
     const definition = schema.properties[field];
     assert.equal(typeof actual[field], definition.type, `${vector.name}: ${field}`);
@@ -84,9 +89,20 @@ assert.equal(inventoryEventId(inventory), inventoryEventId({ ...inventory, depen
 const inv = normalize(JSON.stringify(inventory), {}, { actor: 'user', client_ip: '192.0.2.1' });
 assert.equal(inv.actor, '');
 assert.equal(inv.ip, '');
-for (const malformed of ['null', '[]', '{', JSON.stringify({ ...finding, schema_version: 1 }),
+for (const malformed of [JSON.stringify({ ...finding, server_span_id: '0123456789abcdef' }), JSON.stringify({ ...finding, current_span_id: '0123456789abcdef' }), 'null', '[]', '{', JSON.stringify({ ...finding, schema_version: 1 }),
   JSON.stringify({ ...finding, source: 'other' }),
   JSON.stringify({ ...inventory, part_index: 2, part_count: 2 })]) {
   assert.throws(() => normalize(malformed));
 }
-console.log(`PASS: draft SIEM profile, ${vectors.vectors.length} reference vectors, raw preservation, IDs, and semantic boundaries.`);
+console.log(`PASS: SIEM profile, ${vectors.vectors.length} reference vectors, raw preservation, IDs, and semantic boundaries.`);
+const noSpan = { ...finding };
+delete noSpan.span_id;
+const missingSpan = normalize(JSON.stringify(noSpan));
+assert(!('span_id' in missingSpan));
+const flags = normalize(JSON.stringify({ ...finding, trace_flags: 1 }));
+assert.equal(flags.trace_flags, 1);
+assert.equal(typeof flags.trace_flags, 'number');
+for (const value of ['1', -1, 256, 1.5]) {
+  assert.throws(() => normalize(JSON.stringify({ ...finding, trace_flags: value })));
+}
+console.log('PASS: omitted missing spans and typed trace flags.');
