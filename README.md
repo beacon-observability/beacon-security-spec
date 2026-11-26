@@ -12,9 +12,14 @@ fingerprint version 1 and the Beacon namespace. V2 is a breaking wire-format upd
 examples, and vectors remain available unchanged. Neither version provides aliases for former
 SecurityContext packages, `security.*` configuration, or the `security_context` event source.
 
-Current producers use a SIEM envelope with v2 evidence in `message` and `span_id`
-for invocation correlation. The released runtimes below predate this change
-and provide their originally pinned v2 output and export policy. Runtime support, pinned contract revisions, and release acceptance remain
+The producer contract exports a compact, single-line v2 JSON Body, moving event
+time to native `time_unix_nano` and the occurrence ID to LogRecord
+`attributes.event_id`. The Body omits `observed_at` and `occurrence_id`; all other
+fields and nesting remain unchanged. `source` retains its existing Body and
+attribute placement. There is no SIEM envelope or `message` wrapper. See the
+[Security log binding](spec/log-record-binding.md) and its dedicated
+[Body schema](schemas/beacon-security-log-body-v1.schema.json). `span_id` retains
+its invocation correlation semantics. Runtime support, pinned contract revisions, and release acceptance remain
 owned by each language repository. Published release evidence is not certification that every
 implementation passes every conformance vector, or that a backend accepts its data.
 
@@ -27,7 +32,8 @@ implementation passes every conformance vector, or that a backend accepts its da
 
 ## Contract layout
 
-- [Security SIEM profile v1](spec/siem-fields-v1.md) — current export contract
+- [Security log binding](spec/log-record-binding.md) — current producer export contract.
+- [Security SIEM profile v1](spec/siem-fields-v1.md) — downstream field mapping reference
   with fifteen base fields plus process/trace correlation. Includes a [JSON Schema](schemas/beacon-security-siem-v1.schema.json),
   [examples](examples/siem/), and [reference vectors](test-vectors/siem-v1.json).
 - [V2 event contract and migration](spec/events-v2.md)

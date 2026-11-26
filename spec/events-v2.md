@@ -1,7 +1,11 @@
 # Event contract v2
 
 Schema v2 is an explicitly versioned, incompatible successor to the [v1 event contract](events.md).
-The [v2 JSON Schema](../schemas/beacon-security-event-v2.schema.json) defines the wire shape.
+The [v2 JSON Schema](../schemas/beacon-security-event-v2.schema.json) defines the full
+logical event and historical complete v2 JSON. The current
+[log binding](log-record-binding.md) moves event time and occurrence ID to native
+metadata; its [Body schema](../schemas/beacon-security-log-body-v1.schema.json)
+defines the transmitted JSON shape.
 V1 schemas and examples remain available for existing consumers. Do not validate a v2 event with
 the v1 schema or infer producer support from the existence of this specification.
 
@@ -26,7 +30,9 @@ must distinguish the body contract from collector-specific presentation.
 ## Identity and fingerprints
 
 `instance_id` identifies the runtime process. V2 removes exported `application_id` and uses
-`occurrence_id` as the only occurrence identifier. A repeated detection in a different request
+`occurrence_id` as the logical occurrence identifier. At the log export boundary,
+move it to LogRecord `attributes.event_id` and omit `occurrence_id` from Body;
+these are the same identity, transmitted once. A repeated detection in a different request
 has a different occurrence ID but may retain the same `finding_id`.
 
 Fingerprint version 1 and its [conformance vectors](../test-vectors/fingerprint-v1.json) are
@@ -74,7 +80,7 @@ Request context contains available method, route, HTTP status code, and non-empt
 Sink context contains function, role, location, and only applicable non-empty operation/path/input
 fields. Source, propagation, range, and stack semantics remain as defined in v1. Non-empty evidence
 must not be silently shortened merely to reduce field count. Export the current invocation span as `span_id`, including when it is the HTTP server span.
-Neither the payload nor its SIEM envelope exports `server_span_id` or `current_span_id`.
+Neither the payload nor its optional downstream SIEM projection exports `server_span_id` or `current_span_id`.
 The current schema has no aliases for these removed fields. Omit `span_id` when no valid
 current span exists; do not substitute a different request-entry span. The OTel LogRecord
 associates with the detected invocation span when available. Internal request/server context
@@ -111,7 +117,7 @@ versions or label synthetic metadata digests as artifact hashes.
 
 | Field | Meaning |
 | --- | --- |
-| `observed_at` | Collection time in RFC 3339 UTC; strictly increasing within one producer instance. |
+| `observed_at` | Logical collection time in RFC 3339 UTC; strictly increasing within one producer instance. Transmit only as native `time_unix_nano`, omitting this Body field. |
 | `started_at` | Runtime-process start time in RFC 3339 UTC; fixed for that process, not framework readiness time. |
 | `uptime_ms` | Non-negative runtime uptime in milliseconds at collection start. |
 
@@ -130,18 +136,29 @@ Failed collection or scan/capacity errors that prevent a valid list emit no inve
 preserve their last successful list. V2 removes collection status/error fields, SBOM IDs, revisions, release IDs, and history.
 
 Only oversized lists contain zero-based `part_index` and `part_count >= 2`. Parts share
-`instance_id`, `observed_at`, `started_at`, and `uptime_ms`. Consumers assemble every part of the
-same instance and collection time before atomically replacing the previous list. Missing parts
+`instance_id`, logical `observed_at`, `started_at`, and `uptime_ms`. On the wire,
+parts share native `time_unix_nano` instead of Body `observed_at`. Consumers assemble every part of the
+same instance and native collection time before atomically replacing the previous list. Missing parts
 must not clear or partly replace it; late older rounds must not overwrite a newer completed round.
 The next collection republishes current dependencies without accumulating missing historical parts.
 
 Optional local CycloneDX output remains diagnostic; it does not add online event families or a
 durable history/replay mechanism. Existing v1 consumers must migrate explicitly before consuming v2.
 
-## Export envelope
+## Log export binding
 
-Current producers MUST export the [SIEM v1 envelope](siem-fields-v1.md).
-The v2 shape is the serialized evidence inside `message`, not an alternative
-output mode. There is no format-selection switch or legacy-output fallback.
-Historical stored records are not rewritten. Older released runtimes retain
-their originally pinned contract until upgraded.
+Current producers MUST follow the [Security log binding](log-record-binding.md).
+Move logical `observed_at` to native `time_unix_nano` and finding `occurrence_id`
+to LogRecord `attributes.event_id`; omit both moved fields from the compact,
+single-line JSON Body. Preserve `schema_version`, `event_name`, `source`, and all
+other fields and nesting at their existing paths. Keep the existing `source`
+attribute. The dedicated [Body schema](../schemas/beacon-security-log-body-v1.schema.json)
+validates this transport projection; the complete v2 schema remains unchanged.
+
+Producers MUST NOT add a SIEM wrapper or move this event into `message`. The
+[SIEM field mapping](siem-fields-v1.md) is an optional downstream transformation,
+reading event time and ID from native metadata, not a producer wire format.
+Receivers must explicitly adopt the two field moves. Historical stored records
+are not rewritten, and this specification update does not itself fix a deployed
+runtime. Pinned provenance distinguishes the binding from historical complete
+v2 records; the retained `schema_version=2` alone does not distinguish them.
