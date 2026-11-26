@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/beacon-observability/beacon-security-spec/raw/main/schemas/beacon-security-log-record-v1.schema.json",
+  "title": "Beacon Security logical LogRecord binding v1",
+  "description": "Conformance representation only, not OTLP protobuf JSON or a wrapper to emit as Body. Decode body and validate against the v2 event schema separately.",
+  "type": "object",
+  "required": [
+    "body",
+    "attributes"
+  ],
+  "properties": {
+    "body": {
+      "type": "string",
+      "minLength": 2,
+      "description": "One compact v2 JSON object, no literal CR/LF or trailing newline; never a SIEM envelope.",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "source"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "beacon_security",
+            "beacon_security_sbom"
+          ]
+        },
+        "event.name": {
+          "type": "string",
+          "enum": [
+            "beacon.security.finding",
+            "beacon.security.sbom.inventory"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

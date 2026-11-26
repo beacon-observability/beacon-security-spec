@@ -2,11 +2,13 @@
 
 ## Status and scope
 
-This is the language-neutral Security export contract. Current producers MUST emit
-one SIEM envelope per event on the existing route, with fifteen required base
-fields and available process/trace correlation. It is the only current output
-format; no format-selection switch or legacy output mode is provided. The complete
-serialized v2 evidence remains in `message`. Fingerprint v1 is unchanged.
+This is an optional downstream field mapping reference, not the producer export
+contract. Producers MUST use the [Security log binding](log-record-binding.md):
+original v2 JSON in the LogRecord string Body, with `event_id` and `source` in
+LogRecord attributes. They MUST NOT emit this SIEM envelope on the existing
+Security route. The fifteen-field projection below may be applied by an explicitly
+configured receiving pipeline after decoding the original event. Fingerprint v1
+is unchanged.
 
 The [JSON Schema](../schemas/beacon-security-siem-v1.schema.json),
 [examples](../examples/siem/), [conformance vectors](../test-vectors/siem-v1.json)
@@ -28,9 +30,9 @@ in the enclosing record is necessary: after decoding the envelope, `message` MUS
 string exactly. Inputs MUST be valid UTF-8 JSON objects conforming to the applicable v2 contract.
 Invalid or unsupported inputs MUST NOT be relabeled as a successful profile conversion.
 
-For an Agent implementation, the input is the v2 event serialized at its existing export boundary,
-after its existing evidence sampling and declared truncation. For a Collector implementation, it
-is the received LogRecord's string Body. The profile does not recover data the producer did not
+The input is the received LogRecord's original v2 string Body, after the producer's
+existing evidence sampling and declared truncation. This downstream projection MUST NOT
+be inserted into the Agent export boundary. The profile does not recover data the producer did not
 collect, sampled out, truncated, or dropped. It must not introduce another silent truncation of
 `message`; a conversion that cannot fit its configured budget must be rejected or handled by an
 explicit, documented overflow path, never reported as lossless.
@@ -158,7 +160,7 @@ fifteen base fields and count toward final serialized byte budgets.
 `span_id` is the span active at detection, even when it is the request-entry
 span. Omit it if unavailable; do not substitute a different span or fabricate
 trace context for inventory. Associate the OTel LogRecord with that same span.
-Neither the envelope nor current evidence emits `server_span_id` or
+Neither this downstream projection nor current evidence emits `server_span_id` or
 `current_span_id`; these fields have no aliases. Historical stored records
 remain unchanged, but are not a current producer output mode.
 
@@ -191,27 +193,28 @@ are unchanged. Current producer findings use `span_id` for the current invocatio
 messages remain original and are never rewritten by projection. Optional absence is not replaced with invented values. No additional sensitive
 parameter values, SQL, command content, or URLs are introduced by the normalization itself.
 
-## Transport, budgets, and migration
+## Downstream transport, budgets, and migration
 
-OTel retains the existing scope and native event name / `event.name` / `source` attributes,
-INFO severity, and string Body. The Body is the serialized
-SIEM envelope, whose `message` is the original v2 payload string. Existing contextual
-Resource and Span associations remain intact. Do not emit the profile a second time as a
-parallel copy of the same occurrence on the same route.
+The producer transport is defined exclusively by the [Security log binding](log-record-binding.md).
+The original v2 JSON remains the string Body; `event_id` and `source` are LogRecord
+attributes. Existing Resource, Scope, timestamp, severity, event-name attributes,
+and native trace/span association remain intact. This mapping does not authorize
+changing the producer Body, adding another envelope, or emitting a duplicate event.
 
-The envelope adds identity fields and JSON escaping overhead. Size limits, queue byte accounting,
-and multipart planning MUST use final serialized envelope bytes, including `message` escaping
-and enrichment. Splitting an inventory must retain every dependency exactly once. A collector
-must preserve enrichment before cleaning incoming attributes; an Agent must obtain service and
-tenant identity before removing duplicated Resource maps from its v2 payload.
+Only an explicitly configured downstream conversion may serialize the SIEM projection
+as an envelope, with the original Body retained exactly in `message`. The receiving
+pipeline owns this output format and its consumer migration. Its size limits and
+queue byte accounting must account for final envelope bytes, including escaping and
+enrichment. These downstream budgets MUST NOT alter producer inventory multipart
+planning or introduce truncation of the original Body.
 
-Existing v2 consumers must explicitly adopt this profile and parse `message` for detailed evidence
-and inventory assembly. They cannot require `event_name`, `observed_at`, `occurrence_id`, or
-`dependencies` at the envelope top level. Existing stored records are not rewritten. Historical
-v2 JSON Schema validates the embedded event, not the envelope. Preserve old schemas and vectors;
-do not silently repurpose them for a different shape.
+A receiver on the original Security route MUST continue to parse `schema_version`,
+`event_name`, `observed_at`, `occurrence_id`, and `dependencies` at their original
+v2 paths. Existing stored records are not rewritten. Preserve schemas and vectors;
+do not silently repurpose the v2 event schema for an envelope.
 
-Before adoption, each implementation must publish evidence for exact raw preservation, field
-semantics and absent enrichment, stable IDs, sampled/truncated events, escaped/non-ASCII inputs,
-final byte budgets, multipart assembly, and one real OTel-to-collector path. Neither this contract
-nor its reference-vector checks establish production support or backend acceptance.
+The SIEM examples and reference vectors validate only downstream mapping semantics,
+raw preservation, absent enrichment, and stable IDs. They are not evidence of
+producer export compatibility or backend acceptance. Producer acceptance requires
+the log-binding checks, byte-budget and multipart checks, and a real OTLP-to-receiver
+integration check in each runtime repository.

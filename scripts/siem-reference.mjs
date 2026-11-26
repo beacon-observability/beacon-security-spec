@@ -1,4 +1,5 @@
-// SIEM contract reference; not a runtime exporter or a trust-boundary validator.
+// Optional downstream SIEM mapping; never use this envelope as the producer Body.
+// Not a runtime exporter or a trust-boundary validator.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -11,7 +12,7 @@ export function inventoryEventId(body) {
   return `inventory-${createHash('sha256').update(JSON.stringify(input), 'utf8').digest('hex')}`;
 }
 
-export function normalize(raw, resource = {}, context = {}) {
+export function parseEvent(raw) {
   assert.equal(typeof raw, 'string');
   const body = JSON.parse(raw);
   assert(body && typeof body === 'object' && !Array.isArray(body));
@@ -40,6 +41,12 @@ export function normalize(raw, resource = {}, context = {}) {
   if ('span_id' in body) assert.match(body.span_id, /^[0-9a-f]{16}$/);
   if ('trace_id' in body) assert.match(body.trace_id, /^[0-9a-f]{32}$/);
   if ('trace_flags' in body) assert(Number.isInteger(body.trace_flags) && body.trace_flags >= 0 && body.trace_flags <= 255);
+  return body;
+}
+
+export function normalize(raw, resource = {}, context = {}) {
+  const body = parseEvent(raw);
+  const inventory = body.event_name === 'beacon.security.sbom.inventory';
   const ip = nonempty(context.client_ip);
   return {
     time: body.observed_at,
