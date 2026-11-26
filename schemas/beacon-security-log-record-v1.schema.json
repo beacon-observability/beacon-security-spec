@@ -5,10 +5,16 @@
   "description": "Conformance representation only, not OTLP protobuf JSON or a wrapper to emit as Body. Decode body and validate against the v2 event schema separately.",
   "type": "object",
   "required": [
+    "time_unix_nano",
     "body",
     "attributes"
   ],
   "properties": {
+    "time_unix_nano": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$",
+      "description": "Native LogRecord Unix epoch nanoseconds from Body observed_at, range 1..9223372036854775807. Decimal string in these logical JSON examples only; the OTLP protobuf field is uint64. Validate the numeric range and correspondence to Body separately."
+    },
     "body": {
       "type": "string",
       "minLength": 2,

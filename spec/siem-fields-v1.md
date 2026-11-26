@@ -73,7 +73,11 @@ dots are literal keys, not nested JSON paths.
 
 `time` MUST preserve the event's RFC 3339 UTC observation timestamp. It is not the ingestion time,
 OTel API emission time, or process start time. A DataKit binding maps this field to the Point
-timestamp and `source` to the measurement. This binding does not add a sixteenth ordinary field.
+timestamp and `source` to the measurement when consuming this optional downstream
+projection. On the producer OTLP route, the receiver instead uses native
+`time_unix_nano` as specified in the [log binding](log-record-binding.md#event-timestamp);
+the RFC 3339 string is not the native OTLP timestamp. This downstream binding does
+not add a sixteenth ordinary field.
 
 ### Event identity and aggregation
 

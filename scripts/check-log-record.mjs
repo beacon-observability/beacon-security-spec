@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logRecord } from './log-record-reference.mjs';
+import { eventTimeUnixNano, logRecord } from './log-record-reference.mjs';
 import { inventoryEventId } from './siem-reference.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -11,7 +11,7 @@ const json = path => JSON.parse(read(path));
 const schema = json('schemas/beacon-security-log-record-v1.schema.json');
 const vectors = json('test-vectors/siem-v1.json').vectors.filter(v => v.name !== 'finding-enriched');
 assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
-assert.deepEqual(schema.required, ['body', 'attributes']);
+assert.deepEqual(schema.required, ['time_unix_nano', 'body', 'attributes']);
 assert.deepEqual(schema.properties.attributes.required, ['event_id', 'source']);
 const lineBreak = new RegExp(schema.properties.body.not.pattern);
 
@@ -28,6 +28,10 @@ function receive(record, expected) {
   assert(!('event_id' in body));
   assert.deepEqual(body, expected);
   assert.equal(record.body, JSON.stringify(expected));
+  assert.match(record.time_unix_nano, new RegExp(schema.properties.time_unix_nano.pattern));
+  assert.equal(record.time_unix_nano, eventTimeUnixNano(body.observed_at));
+  assert(BigInt(record.time_unix_nano) <= 9223372036854775807n);
+  assert(!('time_unix_nano' in record.attributes));
   assert.equal(record.attributes.source, body.source);
   assert.equal(record.attributes['event.name'], body.event_name);
   assert.equal(record.attributes.event_id,
@@ -80,3 +84,31 @@ const dependencies = payloads.flatMap(p => p.dependencies);
 assert.equal(dependencies.length, 2);
 assert.equal(new Set(dependencies.map(d => d.name)).size, dependencies.length);
 console.log(`PASS: ${vectors.length} original-body LogRecords, attributes, single-line JSON, receiver paths, and multipart preservation.`);
+
+// Independent expected values catch unit errors and Number precision loss.
+assert.equal(eventTimeUnixNano('2026-10-02T00:00:00.000Z'), '1790899200000000000');
+assert.equal(eventTimeUnixNano('2026-10-02T00:00:00Z'), '1790899200000000000');
+assert.equal(eventTimeUnixNano('2026-10-02T00:00:00.123Z'), '1790899200123000000');
+assert.equal(eventTimeUnixNano('2026-10-02T00:00:00.123456789Z'), '1790899200123456789');
+assert.equal(eventTimeUnixNano('1970-01-01T00:00:00.000000001Z'), '1');
+assert.equal(eventTimeUnixNano('2262-04-11T23:47:16.854775807Z'), '9223372036854775807');
+for (const time of ['1970-01-01T00:00:00Z', '1969-12-31T23:59:59Z',
+  '2262-04-11T23:47:16.854775808Z', '2026-02-30T00:00:00Z',
+  '2026-10-02T00:00:00.1234567891Z', 'invalid']) {
+  assert.throws(() => eventTimeUnixNano(time));
+}
+const precise = { ...finding, observed_at: '2026-10-02T00:00:00.123456789Z' };
+const preciseRecord = logRecord(precise);
+receive(preciseRecord, precise);
+assert.equal(preciseRecord.time_unix_nano, '1790899200123456789');
+assert.equal(preciseRecord.attributes.event_id, precise.occurrence_id);
+assert.notEqual(preciseRecord.attributes.event_id, precise.finding_id);
+const anotherOccurrence = { ...finding, occurrence_id: 'ev-another-request' };
+assert.notEqual(logRecord(anotherOccurrence).attributes.event_id, valid.attributes.event_id);
+assert.equal(JSON.parse(logRecord(anotherOccurrence).body).finding_id, finding.finding_id);
+const earlierInventory = json('examples/sbom-inventory-v2.json');
+const laterInventory = { ...earlierInventory, observed_at: '2026-10-02T00:25:00.000Z' };
+assert.notEqual(logRecord(earlierInventory).attributes.event_id, logRecord(laterInventory).attributes.event_id);
+assert(!('occurrence_id' in JSON.parse(logRecord(earlierInventory).body)));
+assert.deepEqual(logRecord(precise), preciseRecord, 'retransmission preserves timestamp and event ID');
+console.log('PASS: exact native event nanoseconds, int64 receiver limits, and occurrence/transport ID equivalence.');

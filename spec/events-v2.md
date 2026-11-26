@@ -26,7 +26,8 @@ must distinguish the body contract from collector-specific presentation.
 ## Identity and fingerprints
 
 `instance_id` identifies the runtime process. V2 removes exported `application_id` and uses
-`occurrence_id` as the only occurrence identifier. A repeated detection in a different request
+`occurrence_id` as the only occurrence identifier in the Body. The LogRecord
+attribute `event_id` maps to this same value; it is not a separate identity. A repeated detection in a different request
 has a different occurrence ID but may retain the same `finding_id`.
 
 Fingerprint version 1 and its [conformance vectors](../test-vectors/fingerprint-v1.json) are
@@ -143,7 +144,8 @@ durable history/replay mechanism. Existing v1 consumers must migrate explicitly 
 Current producers MUST follow the [Security log binding](log-record-binding.md).
 The LogRecord string Body is the original v2 event serialized as compact, single-line JSON, with `schema_version`,
 `event_name`, and all other existing fields at their original paths. `event_id` and
-`source` are LogRecord attributes. Producers MUST NOT add a SIEM wrapper or move
+`source` are LogRecord attributes. Set native `time_unix_nano` from the event
+instant in `observed_at`, retaining the existing Body timestamp string. Producers MUST NOT add a SIEM wrapper or move
 this event into a `message` string. The [SIEM field mapping](siem-fields-v1.md)
 is a downstream transformation reference, not the producer wire format.
 

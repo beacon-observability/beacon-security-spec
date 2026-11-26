@@ -14,7 +14,8 @@ SecurityContext packages, `security.*` configuration, or the `security_context` 
 
 The producer contract preserves the original v2 JSON event in the OTel LogRecord
 Body as a compact, single-line string, with `event_id` and `source` as LogRecord
-attributes. Producers do not wrap
+attributes. Native `time_unix_nano` carries the event time from `observed_at`.
+Producers do not wrap
 the event in a SIEM envelope or move it into `message`. See the
 [Security log binding](spec/log-record-binding.md). `span_id` retains its invocation
 correlation semantics. Runtime support, pinned contract revisions, and release acceptance remain

@@ -19,6 +19,42 @@ JSON lines. The OTLP Body has no trailing newline. A JSONL file sink writes this
 same Body followed by one LF record delimiter; that delimiter is not part of the
 Body. Do not double-encode the object as a JSON string containing quoted JSON.
 
+## Event timestamp
+
+The event time is the instant represented by `body.observed_at`. Keep that Body
+field as its existing RFC 3339 UTC string; do not change its type to an integer.
+Producers MUST set the native OTel LogRecord timestamp (`time_unix_nano` in OTLP)
+to that same instant as Unix epoch nanoseconds. This is a native LogRecord field,
+not an attribute or an extra field in the Body. A property named `time_unix_nano`
+inside the Body or attributes does not set the native timestamp.
+
+OTLP defines this timestamp as an unsigned 64-bit integer. This binding restricts
+it to `1..9223372036854775807` for receivers using signed int64 nanoseconds; zero
+means unset in OTLP and is not a valid event timestamp here. Invalid or
+unrepresentable times must fail export explicitly rather than silently use the
+queue flush time or wrap on conversion. Use integer arithmetic: seconds times
+`1000000000` plus fractional nanoseconds, or epoch milliseconds times `1000000`
+when the source has millisecond precision. Do not send milliseconds in the
+nanosecond field or invent sub-millisecond precision. Retain available precision
+up to nine fractional digits without floating-point rounding.
+
+The native `observed_time_unix_nano` is the time the OTel collection system
+observed the record. It is separate from the Body field named `observed_at` and
+must not replace a known event timestamp. Queueing, retries, and batch flushing
+MUST NOT change the event time. Consumers should prefer native `time_unix_nano`
+and fall back to native `observed_time_unix_nano` only when event time is unset in
+older records, following the [OTel log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/).
+Conforming new records always set the event timestamp; receivers do not need to
+parse the Body timestamp to determine the Point time.
+
+For example, `2026-10-02T00:00:00.000Z` corresponds to Unix milliseconds
+`1790899200000` and native Unix nanoseconds `1790899200000000000`. Logical JSON
+examples encode this 64-bit value as a decimal string to avoid JavaScript Number
+precision loss. This does not make the protobuf field a string: OTLP/protobuf
+carries the 64-bit integer, and SDK implementations should use the appropriate
+integer timestamp API. The quoted decimal representation is also consistent with
+[ProtoJSON's 64-bit integer mapping](https://protobuf.dev/programming-guides/json/).
+
 ## LogRecord attributes
 
 The following string attributes are required on each record:
@@ -35,7 +71,17 @@ Body as well; mapping it to an attribute does not authorize removing it. Do not 
 `event.name` attribute remain unchanged. Other existing attributes are preserved.
 The fifteen SIEM projection fields are not required producer attributes.
 
-Finding IDs identify individual occurrences, not finding fingerprints or traces.
+For findings, `attributes.event_id` MUST equal `body.occurrence_id` byte for byte.
+They identify the same occurrence and are not two independently generated IDs.
+`occurrence_id` is the existing Body field; `event_id` is the common transport
+attribute shared across event families. A repeated occurrence in another request
+has a new value, while retransmission of an existing occurrence retains its value.
+`finding_id` identifies the stable finding fingerprint, so multiple occurrences
+may share it. Consumers must not substitute `finding_id` for `event_id`.
+
+Inventory events have no `occurrence_id`. Their `event_id` identifies a collection
+round and part, rather than a finding occurrence; do not invent an `occurrence_id`
+for these events.
 For inventory, encode this ordered array as compact UTF-8 JSON and hash its bytes
 with SHA-256:
 
@@ -52,8 +98,9 @@ or parts have different IDs. This is the same identity algorithm as the downstre
 
 ## Transport and receiver compatibility
 
-Retain the existing OTLP transport, endpoint, Resource, Scope, timestamps, INFO
-severity, and native trace/span associations. `span_id` continues to identify the
+Retain the existing OTLP transport, endpoint, Resource, Scope, INFO
+severity, and native trace/span associations. Set the event timestamp as defined
+above rather than using export time. `span_id` continues to identify the
 span active at detection; absent context is not fabricated. No parallel copy of
 the occurrence is emitted. This binding does not prescribe a new protocol or route.
 
@@ -78,13 +125,15 @@ projection is a separate downstream representation, never the producer Body.
 The [reference binding](../scripts/log-record-reference.mjs),
 [example records](../examples/log-records/), and
 [logical-record schema](../schemas/beacon-security-log-record-v1.schema.json)
-describe Body/attribute placement. The examples use a logical `body` / `attributes`
-representation, not OTLP protobuf JSON field names or a new on-wire wrapper.
+describe native timestamp and Body/attribute placement. The examples use logical
+`time_unix_nano`, `body`, and `attributes` fields, not a complete OTLP protobuf
+JSON representation or a new on-wire wrapper.
 Validate decoded Body separately against the unchanged v2 event schema.
 
 Runtime acceptance must cover original-path parsing, single-line serialization,
 escaped/newline and non-ASCII values, occurrence and inventory IDs, sampling,
-truncation, multipart assembly, final byte budgets, and an actual OTLP-to-receiver
+truncation, multipart assembly, exact event timestamps across delayed export and
+retransmission, final byte budgets, and an actual OTLP-to-receiver
 path. Reference checks alone do not establish runtime or backend compatibility.
 
 This corrects the earlier requirement to emit a SIEM envelope. Already released
