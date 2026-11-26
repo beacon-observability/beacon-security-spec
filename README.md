@@ -12,13 +12,14 @@ fingerprint version 1 and the Beacon namespace. V2 is a breaking wire-format upd
 examples, and vectors remain available unchanged. Neither version provides aliases for former
 SecurityContext packages, `security.*` configuration, or the `security_context` event source.
 
-The producer contract preserves the original v2 JSON event in the OTel LogRecord
-Body as a compact, single-line string, with `event_id` and `source` as LogRecord
-attributes. Native `time_unix_nano` carries the event time from `observed_at`.
-Producers do not wrap
-the event in a SIEM envelope or move it into `message`. See the
-[Security log binding](spec/log-record-binding.md). `span_id` retains its invocation
-correlation semantics. Runtime support, pinned contract revisions, and release acceptance remain
+The producer contract exports a compact, single-line v2 JSON Body, moving event
+time to native `time_unix_nano` and the occurrence ID to LogRecord
+`attributes.event_id`. The Body omits `observed_at` and `occurrence_id`; all other
+fields and nesting remain unchanged. `source` retains its existing Body and
+attribute placement. There is no SIEM envelope or `message` wrapper. See the
+[Security log binding](spec/log-record-binding.md) and its dedicated
+[Body schema](schemas/beacon-security-log-body-v1.schema.json). `span_id` retains
+its invocation correlation semantics. Runtime support, pinned contract revisions, and release acceptance remain
 owned by each language repository. Published release evidence is not certification that every
 implementation passes every conformance vector, or that a backend accepts its data.
 

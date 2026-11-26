@@ -2,58 +2,60 @@
 
 ## Producer contract
 
-Each Security finding or dependency inventory event MUST be exported as one OTel
-LogRecord. Its string Body MUST contain the original v2 JSON event object with the
-same fields, values, types, and nesting. Producers MUST NOT add a SIEM envelope,
-move the event into `message`, or rename, remove, or relocate existing event fields
-as a side effect of field mapping. In particular, `schema_version` remains at the
-Body object's top level. The v2 event schema and fingerprint v1 remain unchanged.
-Existing evidence sampling and declared truncation still apply before serialization.
+Export each Security finding or dependency inventory event as one OTel LogRecord.
+The string Body contains the v2 event JSON object with exactly two metadata fields
+moved out at the export boundary:
 
-The Body MUST be compact, single-line JSON: no indentation or literal CR/LF line
-breaks. Newlines within string values MUST be JSON-escaped (`\n` or `\r`), without
-changing the decoded value. This is a serialization requirement, not a change to
-the event structure or a requirement to preserve prior pretty-print whitespace.
-One Body contains exactly one JSON object, never an array or multiple concatenated
-JSON lines. The OTLP Body has no trailing newline. A JSONL file sink writes this
-same Body followed by one LF record delimiter; that delimiter is not part of the
-Body. Do not double-encode the object as a JSON string containing quoted JSON.
+| Logical input | Only transmitted location | Body rule |
+| --- | --- | --- |
+| `observed_at` | Native `time_unix_nano`. | Omit `observed_at`; do not add another Body timestamp for the same instant. |
+| Finding `occurrence_id` | LogRecord `attributes.event_id`. | Omit `occurrence_id`; do not add `event_id` to the Body. |
+
+These are field moves, not copies. The remaining fields, values, types, and nested
+structure MUST remain unchanged. Keep `schema_version` at the top level. Do not
+wrap the event in a SIEM envelope or put it inside `message`. Existing evidence
+sampling and declared truncation apply before serialization; fingerprint v1 is
+unchanged. No new service, runtime, or Resource maps are introduced in the Body.
+This correction does not relocate `source` or any other existing Body field.
+
+The Body MUST be compact, single-line JSON: no indentation, literal CR/LF, or
+trailing newline. Escape newlines within string values without changing the decoded
+value. Each Body contains exactly one object, never an array, multiple concatenated
+JSON lines, or a double-encoded JSON string. A JSONL file sink adds one LF delimiter
+outside the Body. A standalone Body-only file no longer contains event time or the
+finding occurrence ID; a diagnostic sink that needs them must explicitly retain
+native timestamp and attributes outside Body. Do not silently reinsert duplicates
+into the OTLP Body to support a file format.
 
 ## Event timestamp
 
-The event time is the instant represented by `body.observed_at`. Keep that Body
-field as its existing RFC 3339 UTC string; do not change its type to an integer.
-Producers MUST set the native OTel LogRecord timestamp (`time_unix_nano` in OTLP)
-to that same instant as Unix epoch nanoseconds. This is a native LogRecord field,
-not an attribute or an extra field in the Body. A property named `time_unix_nano`
-inside the Body or attributes does not set the native timestamp.
+The event time is the instant represented by logical input `observed_at`. Producers
+MUST set native OTel LogRecord `time_unix_nano` from that instant, then omit
+`observed_at` from the transmitted Body. It is a native LogRecord field, not an
+attribute or an extra JSON member in Body. Native event time is the sole wire
+representation of this instant.
 
 OTLP defines this timestamp as an unsigned 64-bit integer. This binding restricts
-it to `1..9223372036854775807` for receivers using signed int64 nanoseconds; zero
-means unset in OTLP and is not a valid event timestamp here. Invalid or
-unrepresentable times must fail export explicitly rather than silently use the
-queue flush time or wrap on conversion. Use integer arithmetic: seconds times
-`1000000000` plus fractional nanoseconds, or epoch milliseconds times `1000000`
-when the source has millisecond precision. Do not send milliseconds in the
-nanosecond field or invent sub-millisecond precision. Retain available precision
-up to nine fractional digits without floating-point rounding.
+it to `1..9223372036854775807` for signed-int64 receivers. Zero means unset and is
+not valid for new records. Invalid or unrepresentable times must fail export
+explicitly rather than use queue flush time or wrap on conversion. Use integer
+arithmetic: seconds times `1000000000` plus fractional nanoseconds, or epoch
+milliseconds times `1000000` for a millisecond source. Retain available precision
+up to nine fractional digits; do not send milliseconds in the nanosecond field or
+invent sub-millisecond precision.
 
-The native `observed_time_unix_nano` is the time the OTel collection system
-observed the record. It is separate from the Body field named `observed_at` and
-must not replace a known event timestamp. Queueing, retries, and batch flushing
-MUST NOT change the event time. Consumers should prefer native `time_unix_nano`
-and fall back to native `observed_time_unix_nano` only when event time is unset in
-older records, following the [OTel log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/).
-Conforming new records always set the event timestamp; receivers do not need to
-parse the Body timestamp to determine the Point time.
+Native `observed_time_unix_nano` is the time the OTel collection system observed
+the record, a separate lifecycle instant. It must not replace known event time.
+Queueing, retries, and batch flushing MUST NOT change event time. Receivers prefer
+`time_unix_nano`, falling back to `observed_time_unix_nano` only for older records
+with unset event time, following the [OTel log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/).
+New records always set event time; receivers must not require Body `observed_at`.
 
-For example, `2026-10-02T00:00:00.000Z` corresponds to Unix milliseconds
-`1790899200000` and native Unix nanoseconds `1790899200000000000`. Logical JSON
-examples encode this 64-bit value as a decimal string to avoid JavaScript Number
-precision loss. This does not make the protobuf field a string: OTLP/protobuf
-carries the 64-bit integer, and SDK implementations should use the appropriate
-integer timestamp API. The quoted decimal representation is also consistent with
-[ProtoJSON's 64-bit integer mapping](https://protobuf.dev/programming-guides/json/).
+For example, `2026-10-02T00:00:00.000Z` becomes native nanoseconds
+`1790899200000000000`. Logical JSON examples use a decimal string to avoid
+JavaScript Number precision loss; the OTLP protobuf field remains a 64-bit integer,
+consistent with [ProtoJSON's integer mapping](https://protobuf.dev/programming-guides/json/).
+This preserves the instant and its precision, not the original timestamp spelling.
 
 ## LogRecord attributes
 
@@ -61,83 +63,82 @@ The following string attributes are required on each record:
 
 | Attribute | Finding | Dependency inventory |
 | --- | --- | --- |
-| `event_id` | Original `body.occurrence_id`. | Deterministic inventory ID below. |
-| `source` | `beacon_security`, equal to `body.source`. | `beacon_security_sbom`, equal to `body.source`. |
+| `event_id` | Logical input `occurrence_id`, moved without changing its value. | Deterministic inventory ID below. |
+| `source` | `beacon_security`, matching the retained Body `source`. | `beacon_security_sbom`, matching the retained Body `source`. |
 
-These are OTel LogRecord attributes, not Resource attributes and not an
-`attributes` member inserted into the Body JSON. Retain `source` in the original
-Body as well; mapping it to an attribute does not authorize removing it. Do not add
-`event_id` to the Body or rename `occurrence_id`. Existing native event name and
-`event.name` attribute remain unchanged. Other existing attributes are preserved.
-The fifteen SIEM projection fields are not required producer attributes.
+These are LogRecord attributes, not Resource attributes and not an `attributes`
+member inserted in Body. Existing native event name and `event.name` remain
+unchanged. The fifteen SIEM fields are not required producer attributes.
 
-For findings, `attributes.event_id` MUST equal `body.occurrence_id` byte for byte.
-They identify the same occurrence and are not two independently generated IDs.
-`occurrence_id` is the existing Body field; `event_id` is the common transport
-attribute shared across event families. A repeated occurrence in another request
-has a new value, while retransmission of an existing occurrence retains its value.
-`finding_id` identifies the stable finding fingerprint, so multiple occurrences
-may share it. Consumers must not substitute `finding_id` for `event_id`.
+For findings, `event_id` and logical `occurrence_id` mean the same occurrence.
+Transmit that value only as `attributes.event_id`; do not generate a second ID.
+A new occurrence in another request has a new value; retransmission retains the
+same value. `finding_id` is a stable fingerprint shared by multiple occurrences.
+`instance_id` and Resource `service.instance.id` describe process/service-instance
+identity, not occurrences. They must not replace the per-event ID, and per-event
+IDs must not be placed in Resource.
 
-Inventory events have no `occurrence_id`. Their `event_id` identifies a collection
-round and part, rather than a finding occurrence; do not invent an `occurrence_id`
-for these events.
-For inventory, encode this ordered array as compact UTF-8 JSON and hash its bytes
-with SHA-256:
+Inventory has no `occurrence_id`. Its `event_id` identifies a collection round and
+part. Preserve the existing algorithm: before removing `observed_at`, encode this
+ordered array of logical input strings as compact UTF-8 JSON:
 
 ```text
-[body.source, body.event_name, body.instance_id, body.observed_at, decimal_part_index]
+[source, event_name, instance_id, observed_at, decimal_part_index]
 ```
 
-Every element is a string. Use the zero-based part index as decimal without leading
-zeros, or `"0"` for an unpartitioned event. Use literal non-ASCII Unicode scalars
-and required JSON string escapes only. The ID is `inventory-` followed by the
-lowercase hexadecimal digest. Retransmissions retain their ID; different rounds
-or parts have different IDs. This is the same identity algorithm as the downstream
-[SIEM mapping](siem-fields-v1.md#event-identity-and-aggregation).
+Use zero-based decimal part index without leading zeros, or `"0"` for an
+unpartitioned event; literal non-ASCII Unicode scalars and required JSON escapes
+only. Prefix the lowercase SHA-256 digest with `inventory-`. This is the unchanged
+[SIEM identity algorithm](siem-fields-v1.md#event-identity-and-aggregation), computed
+before wire compaction. Receivers retain the supplied ID rather than recomputing
+it from a reformatted timestamp. Identical retransmissions retain the ID; rounds
+and parts have different IDs. Preserve metadata across retries.
 
-## Transport and receiver compatibility
+## Transport, receivers, and byte budgets
 
-Retain the existing OTLP transport, endpoint, Resource, Scope, INFO
-severity, and native trace/span associations. Set the event timestamp as defined
-above rather than using export time. `span_id` continues to identify the
-span active at detection; absent context is not fabricated. No parallel copy of
-the occurrence is emitted. This binding does not prescribe a new protocol or route.
+Keep the existing OTLP transport, endpoint, Resource, Scope, INFO severity, and
+native trace/span associations. `span_id` still means the span active at detection;
+absent context is not fabricated. Emit no duplicate occurrence.
 
-Receivers read `event_id` and `source` from LogRecord attributes, parse Body once
-as a JSON object, and access the original v2 paths. For example,
-`body.schema_version`, `body.attack_evidence.status`, and `body.dependencies`
-retain their existing meaning and position. Inventory assembly continues to use
-`instance_id + observed_at` and `part_index/part_count` from that object.
+Receivers read time from native `time_unix_nano` and the per-event ID from
+`attributes.event_id`. Parse Body once and read all remaining v2 fields at their
+existing paths, including `schema_version`, `event_name`, `attack_evidence`, and
+`dependencies`. The only removed Body fields are `observed_at` and `occurrence_id`.
+Inventory assembly uses Body `instance_id` plus native event time and Body
+`part_index/part_count`. Parts of one collection retain identical native event
+time. Missing parts do not clear prior inventory; older rounds do not overwrite
+newer completed rounds. Body `started_at` and `uptime_ms` retain their separate
+process-start/uptime meanings.
 
-Size limits, queue byte accounting, and inventory multipart planning use the final
-compact UTF-8 Body bytes, without SIEM wrapping or JSON-within-JSON escaping overhead.
-Transport attributes also count toward any whole-record or OTLP request limit.
-Do not silently truncate the Body to accommodate added attributes. Inventory
-partitioning must retain every dependency exactly once.
+Byte limits, queue accounting, and inventory multipart planning MUST use final
+compact UTF-8 Body bytes after these field moves. Attributes and native metadata
+also count toward whole-record/request limits. Do not silently truncate Body to
+accommodate metadata. Partitioning retains every dependency exactly once.
+An optional [SIEM downstream projection](siem-fields-v1.md) must read event time
+and ID from native metadata, preserving the received Body exactly in `message`.
+It is never the producer Body.
 
-An explicitly configured receiving pipeline may apply the optional
-[SIEM field mapping](siem-fields-v1.md) after reading the original event. That
-projection is a separate downstream representation, never the producer Body.
+## Schemas, conformance, and migration
 
-## Conformance and migration
+The [v2 event schema](../schemas/beacon-security-event-v2.schema.json) continues to
+describe the full logical input and historical complete v2 JSON. Validate the new
+transmitted Body against the dedicated [log Body schema](../schemas/beacon-security-log-body-v1.schema.json),
+which removes only the two moved fields. This transport binding is identified in
+pinned implementation provenance; `schema_version=2` alone does not distinguish
+historical complete events from this bound Body. Do not silently repurpose the
+historical schema or claim unchanged receiver paths for the moved fields.
 
 The [reference binding](../scripts/log-record-reference.mjs),
-[example records](../examples/log-records/), and
-[logical-record schema](../schemas/beacon-security-log-record-v1.schema.json)
-describe native timestamp and Body/attribute placement. The examples use logical
-`time_unix_nano`, `body`, and `attributes` fields, not a complete OTLP protobuf
-JSON representation or a new on-wire wrapper.
-Validate decoded Body separately against the unchanged v2 event schema.
+[examples](../examples/log-records/), and [logical-record schema](../schemas/beacon-security-log-record-v1.schema.json)
+use logical `time_unix_nano`, `body`, and `attributes` fields for conformance.
+This is not a new Body wrapper or a complete OTLP protobuf JSON representation.
 
-Runtime acceptance must cover original-path parsing, single-line serialization,
-escaped/newline and non-ASCII values, occurrence and inventory IDs, sampling,
-truncation, multipart assembly, exact event timestamps across delayed export and
-retransmission, final byte budgets, and an actual OTLP-to-receiver
-path. Reference checks alone do not establish runtime or backend compatibility.
+Acceptance must cover absence of duplicate time/occurrence fields, original paths
+for retained fields, exact timestamps and IDs across retries, escaped/non-ASCII
+values, sampling/truncation, multipart assembly, final byte budgets, and an actual
+OTLP-to-receiver path. Reference checks do not prove runtime/backend compatibility.
 
-This corrects the earlier requirement to emit a SIEM envelope. Already released
-runtimes that wrap events need a separately tested implementation fix; updating
-this specification does not change their output. Do not modify the receiver to
-require a `message` wrapper or rewrite historical stored records as part of this
-correction. Rollout of runtime fixes must verify the original receiver contract.
+Updating this specification does not repair released runtimes. Coordinate receiver
+and producer adoption of the two explicit field moves; do not require `message`
+wrapping or rewrite historical stored records. Historical Body-only archives need
+their original decoder; new Body-only archives cannot supply omitted metadata.
